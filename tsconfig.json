@@ -9,7 +9,7 @@
 		"strictNullChecks": false,
 		"strictPropertyInitialization": false,
 		"rootDir": "./webapp",
-		"types": ["@openui5/types", "@types/qunit"],
+		"types": ["@openui5/types", "@types/qunit", "@types/lodash"],
 		"paths": {
 			"my/tsapp/showcase/*": ["./webapp/*"],
 			"unit/*": ["./webapp/test/unit/*"],

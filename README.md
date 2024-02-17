@@ -1,100 +1,135 @@
-# UI5 Application my.tsapp.showcase
+# UI5 Showcase OSS Libraries From NPM Packages For TypeScript
 
-Insert the purpose of this project and some interesting info here...
+This project demonstrates how to use OSS libraries from NPM packages for external libraries, use them at runtime in UI5 applications and to benefit from the TypeScript support for code completion.
 
-## Description
+In order to use OSS libraries from NPM packages at development time with code completion and finally at runtime you need to know the following UI5 tooling extension:
 
-This app demonstrates a TypeScript setup for developing UI5 applications. The central entry point for all information about using TypeScript with UI5 is at [https://sap.github.io/ui5-typescript](https://sap.github.io/ui5-typescript).
+* [ui5-tooling-modules](https://www.npmjs.com/package/ui5-tooling-modules)
 
-**The template is inspired by the [`SAP-samples/ui5-typescript-helloworld`](https://github.com/SAP-samples/ui5-typescript-helloworld) project which also contains [a detailed step-by-step guide](https://github.com/SAP-samples/ui5-typescript-helloworld/blob/main/step-by-step.md). It explains how this setup is created and how all the bits and pieces fit together.**
+With this tooling extensions you can include many OSS libraries available as NPM package which are useful for the client-side applications. The tooling extension ensures that you can use the OSS library at development time and include them into the application bundle at build time.
 
-## Requirements
+This works with and without TypeScript as you access the modules from the OSS library with their NPM package name as prefix. For TypeScript the type definitions provided by the library or by [DefinitelyTyped](https://definitelytyped.org/) work seamlessly as the import path of the OSS library matches to the expected path:
 
-Either [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/) for dependency management.
+```js
+ // JavaScript define/require
+sap.ui.define(["lodash"], function(lodash) {
+  const { reverse } = lodash;
+  ...
+});
 
-## Preparation
-
-Use `npm` (or `yarn`) to install the dependencies:
-
-```sh
-npm install
+// TypeScript import (code completion works!)
+import { reverse } from "lodash";
 ```
 
-(To use yarn, just do `yarn` instead.)
+## How-To Use OSS Libraries
 
-## Run the App
+The following steps will explain how you can use OSS libraries in a *standalone* UI5 applications. The solution is not possible for *non-standalone* scenarios as you are most probably not allowed to configure the loader there.
 
-Execute the following command to run the app locally for development in watch mode (the browser reloads the app automatically when there are changes in the source code):
+For the showcase we are including `lodash` as a OSS library into the UI5 application.
 
-```sh
-npm start
-```
+### Preparation
 
-As shown in the terminal after executing this command, the app is then running on http://localhost:8080/index.html. A browser window with this URL should automatically open.
-
-(When using yarn, do `yarn start` instead.)
-
-## Debug the App
-
-In the browser, you can directly debug the original TypeScript code, which is supplied via sourcemaps (need to be enabled in the browser's developer console if it does not work straight away). If the browser doesn't automatically jump to the TypeScript code when setting breakpoints, use e.g. `Ctrl`/`Cmd` + `P` in Chrome to open the `*.ts` file you want to debug.
-
-## Build the App
-
-### Unoptimized (but quick)
-
-Execute the following command to build the project and get an app that can be deployed:
+The project has been created using the [easy-ui5](https://github.com/SAP/generator-easy-ui5) generator by using the [generator-ui5-ts-app](https://github.com/ui5-community/generator-ui5-ts-app).
 
 ```sh
-npm run build
+> ~  % yo easy-ui5 ts-app
+
+     _-----_     
+    |       |    ╭──────────────────────────╮
+    |--(o)--|    │  Welcome to the easy-ui5 │
+   `---------´   │     3.8.0 generator!     │
+    ( _´U`_ )    ╰──────────────────────────╯
+    /___A___\   /
+     |  ~  |     
+   __'.___.'__   
+ ´   `  |° ´ Y ` 
+                                   
+? Enter your application id (namespace)? my.tsapp.showcase
+? Which framework do you want to use? OpenUI5
+? Which framework version do you want to use? 1.120.7
+? Who is the author of the application? Peter Muessig
+? Would you like to create a new directory for the application? Yes
+? Would you like to initialize a local git repository for the application? Yes
 ```
 
-The result is placed into the `dist` folder. To start the generated package, just run
+### Step 1: Install and configure the tooling extension `ui5-tooling-modules`
+
+Run the following commands to install `ui5-tooling-modules` (as dev dependency):
 
 ```sh
-npm run start:dist
+npm i ui5-tooling-modules -D
 ```
 
-Note that `index.html` still loads the UI5 framework from the relative URL `resources/...`, which does not physically exist, but is only provided dynamically by the UI5 tooling. So for an actual deployment you should change this URL to either [the CDN](https://sdk.openui5.org/#/topic/2d3eb2f322ea4a82983c1c62a33ec4ae) or your local deployment of UI5.
+In your `ui5.yaml` you need to add the `ui5-tooling-modules-task` in the `customTasks` section and the `ui5-tooling-modules-middleware` in the `customMiddleware` section:
 
-(When using yarn, do `yarn build` and `yarn start:dist` instead.)
+```yaml
+specVersion: "3.0"
+[...]
+builder:
+  customTasks:
+    - name: ui5-tooling-transpile-task
+      afterTask: replaceVersion
+    - name: ui5-tooling-modules-task
+      afterTask: ui5-tooling-transpile-task
+      configuration:
+        addToNamespace: true
+server:
+  customMiddleware:
+    - name: ui5-tooling-transpile-middleware
+      afterMiddleware: compression
+    - name: ui5-tooling-modules-middleware
+      afterMiddleware: ui5-tooling-transpile-middleware
+    - name: ui5-middleware-livereload
+      afterMiddleware: compression
+```
 
-### Optimized
+When using the `ui5-tooling-transpile` in combination with the `ui5-tooling-modules` we need to ensure a proper execution order which requires to run the transpile before the module generation. With the usage of the `afterTask` and `afterMiddleware` configuration options this can be achieved.
 
-For an optimized self-contained build (takes longer because the UI5 resources are built, too), do:
+The configuration option `addToNamespace` for the `ui5-tooling-modules-task` is important to use since it ensures to include the OSS modules into the namespace of your application or library (e.g. in this example into the namespace `my/tsapp/showcase/thirdparty`). Once you build your application, you will find the OSS modules there. This will safeguard you from deployment issues or conflicts with other similar OSS modules.
+
+### Step 2: Install the OSS depencencies
+
+Run the following commands to install `lodash` (as dependency) and the type definitions for `lodash` from DefinitelyTyped (as dev dependency):
 
 ```sh
-npm run build:opt
+npm i lodash
+
+npm i @types/lodash -D
 ```
 
-To start the generated package, again just run:
+### Step 3: Add lodash as a dependency to your tsconfig.json
 
-```sh
-npm run start:dist
+To get code completion support for `lodash` in TypeScript, you need to add the `@types/lodash` as type in your `tsconfig.json` in the section `types`:
+
+```json
+{
+  ...
+  "types": ["@openui5/types", "@types/qunit", "@types/lodash"],
+  ...
+}
 ```
 
-In this case, all UI5 framework resources are also available within the `dist` folder, so the folder can be deployed as-is to any static web server, without changing the bootstrap URL.
+### Step 4: Using the OSS Library and Benefit from Code Completion
 
-With the self-contained build, the bootstrap URL in `index.html` has already been modified to load the newly created `sap-ui-custom.js` for bootstrapping, which contains all app resources as well as all needed UI5 JavaScript resources. Most UI5 resources inside the `dist` folder are for this reason actually **not** needed to run the app. Only the non-JS-files, like translation texts and CSS files, are used and must also be deployed. (Only when for some reason JS files are missing from the optimized self-contained bundle, they are also loaded separately.)
+Now it's time to use `lodash` in your UI5 application. Just import lodash functions from the lodash module as follows and you will get proper support
 
-(When using yarn, do `yarn build:opt` and `yarn start:dist` instead.)
+```js
+import { reverse } from "lodash";
 
-## Check the Code
-
-Do the following to run a TypeScript check:
-
-```sh
-npm run ts-typecheck
+reverse("Hello World!".split("")).join(""));
 ```
 
-This checks the application code for any type errors (but will also complain in case of fundamental syntax issues which break the parsing).
+### Wrap up
 
-To lint the TypeScript code, do:
+That's it. Enjoy...
 
-```sh
-npm run lint
-```
+## How to obtain support
 
-(Again, when using yarn, do `yarn ts-typecheck` and `yarn lint` instead.)
+Please use the GitHub bug tracking system to post questions, bug reports or to create pull requests.
+
+## Contributing
+
+Any type of contribution (code contributions, pull requests, issues) to this showcase will be equally appreciated.
 
 ## License
 
